@@ -1,0 +1,268 @@
+---
+title: "Introduction to BayesCNet"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to BayesCNet}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(BayesCNet)
+```
+
+## Introduction
+
+BayesCNet is an R package for inferring cell-type-specific gene regulatory networks from paired single-cell RNA-seq and ATAC-seq data. The key innovation is the use of a hierarchical Bayesian framework that leverages relationships between cell types to improve inference accuracy.
+
+## Installation
+
+```{r eval=FALSE}
+# Install from GitHub
+devtools::install_github("yourusername/BayesCNet")
+```
+
+## Overview of the Method
+
+BayesCNet uses a two-stage workflow:
+
+1. **Data Preparation Stage**: Set up the data structure and define all necessary components
+2. **Inference Stage**: Run the Bayesian model to infer regulatory networks
+
+### Key Concepts
+
+- **Cell Type Hierarchy**: Defines relationships between cell types (e.g., T cells → CD4 T cells)
+- **Metacells**: Aggregated cells that reduce noise and computational burden
+- **Regulatory Windows**: Genomic regions around genes where regulatory elements are searched
+- **Importance Scores**: Measure the strength and confidence of regulatory connections
+
+## Quick Start Example
+
+Here's a minimal example using simulated data:
+
+```{r example, eval=FALSE}
+# Load your Seurat object with RNA and ATAC data
+# For this example, we'll use the provided PBMC data
+# load("pbmc_seurat.rda")
+
+# Create BayesCNet object
+bcnet <- CreateBayesCNet(
+  seurat_object = pbmc,
+  rna_assay = "RNA",
+  atac_assay = "ATAC",
+  cell_type_col = "celltype"
+)
+
+# Define cell type hierarchy
+# This example shows a simple immune cell hierarchy
+edges <- c(
+  "HSPC", "T Cells",      # Hematopoietic stem cells → T cells
+  "HSPC", "B Cells",      # Hematopoietic stem cells → B cells
+  "T Cells", "CD4 T",     # T cells → CD4 T cells
+  "T Cells", "CD8 T"      # T cells → CD8 T cells
+)
+
+bcnet <- AddCellTypeHierarchy(bcnet, edges, lambda = 1.0)
+
+# Add gene annotation (TSS information)
+# In practice, load this from biomaRt or a reference file
+gene_annotation <- data.frame(
+  gene = c("IL2", "CD4", "CD8A", "MS4A1"),
+  chr = c("chr4", "chr12", "chr2", "chr11"),
+  tss = c(123456789, 6934951, 87011728, 60223282)
+)
+
+bcnet <- AddGeneAnnotation(bcnet, gene_annotation)
+
+# Aggregate cells into metacells
+bcnet <- AggregateByKNN(bcnet, k = 50)
+
+# Select variable genes
+bcnet <- AddVariableGenes(bcnet, method = "markers")
+
+# Run inference
+bcnet <- RunBayesCNet(bcnet, window = 250000, cores = 4)
+
+# Get results
+all_networks <- GetAllNetworks(bcnet)
+head(all_networks)
+```
+
+## Detailed Workflow
+
+### Step 1: Data Preparation
+
+The first step is creating a BayesCNet object from your data:
+
+```{r, eval=FALSE}
+bcnet <- CreateBayesCNet(seurat_object)
+```
+
+Requirements:
+- RNA assay with gene expression counts
+- ATAC assay with peak accessibility counts
+- Cell type annotations in metadata
+
+### Step 2: Define Cell Type Hierarchy
+
+The cell type hierarchy captures biological relationships:
+
+```{r, eval=FALSE}
+# Define parent-child relationships
+edges <- c("Parent1", "Child1", "Parent1", "Child2", ...)
+
+# Add to object
+bcnet <- AddCellTypeHierarchy(bcnet, edges, lambda = 1.0)
+```
+
+The `lambda` parameter controls how much information is shared between related cell types:
+- Higher lambda → less sharing (more independent inference)
+- Lower lambda → more sharing (stronger hierarchical influence)
+
+### Step 3: Add Gene Annotation
+
+Gene TSS (transcription start site) information is needed to define regulatory windows:
+
+```{r, eval=FALSE}
+# Annotation must have: gene, chr, tss columns
+bcnet <- AddGeneAnnotation(bcnet, gene_annotation_df)
+```
+
+### Step 4: Cell Aggregation
+
+Aggregating cells into metacells reduces noise and improves computational efficiency:
+
+```{r, eval=FALSE}
+bcnet <- AggregateByKNN(
+  bcnet, 
+  k = 50,           # 50 nearest neighbors
+  max_overlap = 0.8  # Maximum 80% overlap between metacells
+)
+```
+
+### Step 5: Gene Selection
+
+Select genes for network inference:
+
+```{r, eval=FALSE}
+# Option 1: Find cell type markers automatically
+bcnet <- AddVariableGenes(bcnet, method = "markers")
+
+# Option 2: Use custom gene list
+bcnet <- AddVariableGenes(bcnet, method = "custom", genes = my_genes)
+```
+
+### Step 6: Run Inference
+
+Execute the Bayesian inference:
+
+```{r, eval=FALSE}
+bcnet <- RunBayesCNet(
+  bcnet,
+  window = 250000,      # Search 250kb around each gene
+  regularization = 1e-6,
+  cores = 4             # Parallel processing
+)
+```
+
+## Understanding the Results
+
+The output contains these columns:
+
+- **CellType**: The cell type for this network
+- **Gene**: Target gene being regulated
+- **Peak1**: Promoter peak
+- **Peak2**: Enhancer peak
+- **Pmean**: Posterior mean of the regulatory coefficient
+- **Pvar**: Posterior variance (uncertainty)
+- **Importance**: Combined measure of effect size and confidence
+
+### Interpreting Importance Scores
+
+The importance score combines effect size and certainty:
+$$\text{Importance} = \frac{|\text{Pmean}|}{\sqrt{\text{Pvar}}}$$
+
+Higher importance indicates:
+- Stronger regulatory effect (high |Pmean|)
+- Higher confidence (low Pvar)
+
+### Filtering Results
+
+```{r, eval=FALSE}
+# Get high-confidence connections
+high_conf <- all_networks[all_networks$Importance > 3, ]
+
+# Get cell-type-specific network
+cd4_network <- GetCellTypeSpecificNetwork(
+  bcnet, 
+  celltype = "CD4 T",
+  min_importance = 2.0,
+  top_n = 100
+)
+```
+
+## Advanced Usage
+
+### Custom Parameters
+
+```{r, eval=FALSE}
+# Smaller window for computational efficiency
+bcnet <- RunBayesCNet(bcnet, window = 100000)
+
+# Stronger regularization for sparse networks
+bcnet <- RunBayesCNet(bcnet, regularization = 1e-4)
+```
+
+### Analyzing Results
+
+```{r, eval=FALSE}
+library(dplyr)
+
+# Compare networks across cell types
+network_summary <- all_networks %>%
+  group_by(CellType) %>%
+  summarise(
+    n_connections = n(),
+    mean_importance = mean(Importance),
+    n_genes = n_distinct(Gene)
+  )
+
+# Gene-centric view
+il2_regulation <- all_networks %>%
+  filter(Gene == "IL2") %>%
+  arrange(desc(Importance))
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Cell types in data not found in hierarchy"**
+   - Ensure all cell types in your data are included in the hierarchy
+   
+2. **"No marker genes found"**
+   - Lower the thresholds in `AddVariableGenes()`
+   - Check that gene names match between RNA data and annotation
+
+3. **"Cell types with fewer than k cells"**
+   - Reduce k in `AggregateByKNN()`
+   - Filter out rare cell types
+
+### Performance Tips
+
+- Start with a smaller gene set for testing
+- Use multiple cores for large datasets
+- Adjust window size based on your computational resources
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

@@ -1,0 +1,53 @@
+Package: BayesCNet
+Type: Package
+Title: Hierarchical Bayesian Inference of Cell Type-Specific Regulatory Networks
+Version: 0.1.0
+Authors@R: c(
+    person("Fengdi", "Zhao", email = "fengdizhao@ufl.edu", 
+           role = c("aut", "cre"))
+    )
+Maintainer: The package maintainer <yourself@somewhere.net>
+Description: A hierarchical Bayesian framework for inferring cell type-specific 
+    gene regulatory networks from single-cell multi-omics data. Leverages cell 
+    type relationships to improve network accuracy, especially for rare cell 
+    populations.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 4.0.0),
+    methods
+Imports:
+    Matrix (>= 1.3-4),
+    igraph (>= 1.2.6),
+    MASS,
+    expm,
+    Seurat (>= 4.0.0),
+    SingleCellExperiment,
+    SummarizedExperiment,
+    Signac,
+    GenomicRanges,
+    S4Vectors,
+    FNN,
+    parallel,
+    stats,
+    utils
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    BiocStyle,
+    dplyr,
+    ggplot2
+RoxygenNote: 7.2.3
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Collate:
+    'AllGenerics.R'
+    'AllClasses.R'
+    'Utils.R'
+    'CreateBayesCNet.R'
+    'DataPreparation.R'
+    'RunBayesCNet.R'
+    'Accessors.R'
+    'zzz.R'
