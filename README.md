@@ -1,111 +1,218 @@
 # BayesCNet
-BayesCNet: Hierarchical Bayesian inference of cell type-specific gene regulatory networks from single-cell multi-omics data. Leverages cell type relationships to improve network accuracy, especially for rare cell populations.
-# BayesCNet
 
 **B**ayesian **C**ell-type-specific **Net**work Inference from Single-cell Multi-omics Data
 
 ## Overview
+![BayesCNet Overview](inst/figures/fig2A.png)
 
-BayesCNet is an R package for inferring cell-type-specific gene regulatory networks from paired single-cell RNA-seq and ATAC-seq data. It uses a hierarchical Bayesian framework that leverages cell type relationships to improve network inference accuracy.
+BayesCNet infers cell-type-specific gene regulatory networks from paired single-cell RNA-seq and ATAC-seq data. It uses a hierarchical Bayesian framework that leverages cell type relationships to improve network inference accuracy.
 
-## Key Features
-
-- **Cell-type-specific inference**: Infers distinct regulatory networks for each cell type
-- **Hierarchical modeling**: Uses cell type relationships to share information across related cell types
-- **Multi-omics integration**: Combines scRNA-seq and scATAC-seq data
-- **Scalable**: Supports parallel processing for large datasets
-- **User-friendly**: Two-stage workflow with clear data preparation and inference steps
-
+![BayesCNet Downstream Analysis](inst/figures/fig2B.png)
+The inferred cell-type-specific cis-regulatory networks support downstream analyses, including: Heritability enrichment analysis using stratified linkage disequilibrium score regression (S-LDSC); TF–gene network construction, where transcription factors are connected to target genes through predicted enhancer elements, integrating motif binding predictions and TF expression.
 ## Installation
 
 ```r
-# Install from GitHub (once available)
-# devtools::install_github("yourusername/BayesCNet")
-
-# For development
-devtools::load_all("path/to/BayesCNet")
+# Install from GitHub
+# install.packages("devtools")
+devtools::install_github("fzhaouf/BayesCNet")
 ```
 
 ## Quick Start
 
+### Load Demo Data
+
 ```r
 library(BayesCNet)
 
-# Stage 1: Data Preparation
-# Create BayesCNet object from Seurat
-bcnet <- CreateBayesCNet(seurat_object)
+# Download demo PBMC data (hosted separately due to size)
+# This subset contains 4 cell types: CD16 Mono, CD4 TEM, CD8 TEM_1, Naive B
+download.file("https://www.dropbox.com/scl/fi/ixdlcc1qkodtb3yy28zsu/pbmc_demo.rds?rlkey=aoxo00ckfnqddfwgx89g93l71&dl=0",
+              "pbmc_demo.rds")
+pbmc_subset <- readRDS("pbmc_demo.rds")  # loads pbmc_subset object
 
-# Add cell type hierarchy
-edges <- c("HSPC", "T Cells", "T Cells", "CD4 T", "T Cells", "CD8 T")
-bcnet <- AddCellTypeHierarchy(bcnet, edges, lambda = 1.0)
-
-# Add gene annotation
-bcnet <- AddGeneAnnotation(bcnet, gene_annotation_df)
-
-# Aggregate cells
-bcnet <- AggregateByKNN(bcnet, k = 50)
-
-# Select variable genes
-bcnet <- AddVariableGenes(bcnet, method = "markers")
-
-# Stage 2: Run Inference
-bcnet <- RunBayesCNet(bcnet, window = 250000, cores = 4)
-
-# Access Results
-all_networks <- GetAllNetworks(bcnet)
-cd4_network <- GetCellTypeSpecificNetwork(bcnet, "CD4 T Cells")
+# Check the data
+table(pbmc_subset$celltype)
+# CD8 TEM_1   CD4 TEM   Naive B CD16 Mono 
+#       302       542       145       521
 ```
 
-## Workflow
+### Complete Analysis Pipeline
 
-### Stage 1: Data Preparation
+```r
+# Step 1: Create BayesCNet object from Seurat
+bcnet <- CreateBayesCNet(pbmc_subset, cell_type_col = "celltype")
 
-1. **Create BayesCNet object**: Import data from Seurat or raw matrices
-2. **Define cell type hierarchy**: Specify relationships between cell types
-3. **Add gene annotation**: Provide TSS information for regulatory window definition
-4. **Aggregate cells**: Create metacells using KNN approach
-5. **Select genes**: Choose cell-type marker genes or custom gene set
+# Alternative: Create from matrices
+# rna_counts <- as.matrix(GetAssayData(pbmc_subset, assay = "RNA", slot = "counts"))
+# atac_counts <- as.matrix(GetAssayData(pbmc_subset, assay = "ATAC", slot = "counts"))
+# cell_meta <- pbmc_subset@meta.data
+# cell_meta$cell_type <- cell_meta$celltype
+# bcnet <- CreateBayesCNetFromMatrices(rna_counts, atac_counts, cell_meta)
 
-### Stage 2: Inference
+# Step 2: Define cell type hierarchy
+# Using full PBMC hierarchy
+edges <- c("HSPC", "Monocytes",
+           "HSPC", "T Cells",
+           "HSPC", "B Cells",
+           "Monocytes", "CD14 Mono",
+           "Monocytes", "CD16 Mono",
+           "T Cells", "CD4 T Cells",
+           "T Cells", "CD8 T Cells",
+           "CD4 T Cells", "CD4 Naive",
+           "CD4 T Cells", "CD4 TCM",
+           "CD4 T Cells", "CD4 TEM",
+           "CD8 T Cells", "CD8 Naive",
+           "CD8 T Cells", "CD8 TEM_1",
+           "CD8 T Cells", "CD8 TEM_2",
+           "B Cells", "Naive B",
+           "B Cells", "Memory B")
 
-1. **Run BayesCNet**: Execute the Bayesian inference model
-2. **Access results**: Extract cell-type-specific networks
+bcnet <- AddCellTypeHierarchy(bcnet, edges, lambda = 1.0)
 
-## Input Requirements
+# Step 3: Add gene annotation
+# Using EnsDb for human gene annotations
+library(EnsDb.Hsapiens.v86)
 
-- **RNA data**: Gene expression counts (genes × cells)
-- **ATAC data**: Peak accessibility counts (peaks × cells)
-- **Cell metadata**: Must include cell type annotations
-- **Gene annotation**: TSS coordinates for genes of interest
+# Get TSS information for protein-coding genes
+edb <- EnsDb.Hsapiens.v86
+transcripts_info <- transcripts(edb, 
+                                filter = TxBiotypeFilter("protein_coding"),
+                                columns = c("gene_name", "tx_seq_start", "tx_cds_seq_start"))
 
-## Output
+# Extract TSS positions
+tss_pos <- ifelse(strand(transcripts_info) == "+", 
+                  start(transcripts_info), 
+                  end(transcripts_info))
 
-The main output is a data frame containing:
-- `CellType`: Cell type name
-- `Gene`: Target gene
-- `Peak1`: Promoter peak
-- `Peak2`: Enhancer peak
-- `Pmean`: Posterior mean of regulatory coefficient
-- `Pvar`: Posterior variance
-- `Importance`: Importance score (|Pmean|/sqrt(Pvar))
+# Create annotation dataframe
+gene_annotation <- data.frame(
+  gene = mcols(transcripts_info)$gene_name,
+  chr = paste0("chr", seqnames(transcripts_info)),
+  tss = tss_pos,
+  stringsAsFactors = FALSE
+)
 
-## Method Details
+# Keep unique genes and regular chromosomes
+gene_annotation <- gene_annotation[!duplicated(gene_annotation$gene), ]
+regular_chr <- paste0("chr", c(1:22, "X", "Y"))
+gene_annotation <- gene_annotation[gene_annotation$chr %in% regular_chr, ]
 
-BayesCNet implements a hierarchical Bayesian model that:
-1. Models gene expression as a function of chromatin accessibility
-2. Shares information across cell types based on their hierarchical relationships
-3. Infers cell-type-specific regulatory coefficients
-4. Provides uncertainty estimates for each connection
+bcnet <- AddGeneAnnotation(bcnet, gene_annotation)
+
+# Step 4: Aggregate cells into metacells
+bcnet <- AggregateByKNN(bcnet, k = 50, max_overlap = 0.8)
+
+# Step 5: Select variable genes
+# Method 1: Find cell type markers
+bcnet <- AddVariableGenes(bcnet, 
+                         method = "markers", 
+                         min.pct = 0.01, 
+                         logfc.threshold = 0.01)
+
+# Method 2: Use custom gene list
+# custom_genes <- c("IL2", "CD4", "CD8A", "MS4A1", "GNLY")
+# bcnet <- AddVariableGenes(bcnet, method = "custom", genes = custom_genes)
+
+# Step 6: Check readiness
+IsReadyForInference(bcnet)
+
+# Step 7: Run Bayesian inference
+# For testing, use fewer genes and smaller window
+if (length(bcnet@variable_genes) > 20) {
+  bcnet@variable_genes <- bcnet@variable_genes[1:20]
+}
+
+bcnet <- RunBayesCNet(bcnet, 
+                     window = 100000,  # 100kb for faster testing
+                     cores = 1,        # Increase for real analysis
+                     verbose = TRUE)
+```
+
+### Analyze Results
+
+```r
+# Get all networks
+all_networks <- GetAllNetworks(bcnet)
+head(all_networks)
+
+# Get cell-type-specific network
+cd4_network <- GetCellTypeSpecificNetwork(bcnet, "CD4 TEM")
+naive_b_network <- GetCellTypeSpecificNetwork(bcnet, "Naive B")
+
+# Filter by importance score
+high_confidence <- all_networks[all_networks$Importance > 2, ]
+
+```
+
+## Full Analysis Parameters
+
+For production analysis, use full parameters:
+
+```r
+# Use all variable genes
+bcnet <- AddVariableGenes(bcnet, method = "markers")
+
+# Run with larger window and parallel processing
+bcnet <- RunBayesCNet(bcnet,
+                     window = 250000,  # 250kb regulatory window
+                     cores = 8,        # Parallel processing
+                     regularization = 1e-6)
+```
+
+## Key Functions
+
+### Object Creation
+- `CreateBayesCNet()` - Create from Seurat object
+- `CreateBayesCNetFromMatrices()` - Create from count matrices
+
+### Data Preparation
+- `AddCellTypeHierarchy()` - Define cell type relationships
+- `AddGeneAnnotation()` - Add gene TSS information
+- `AggregateByKNN()` - Create metacells
+- `AddVariableGenes()` - Select genes for analysis
+
+### Inference
+- `RunBayesCNet()` - Run Bayesian network inference
+
+### Results Access
+- `GetAllNetworks()` - Get all inferred connections
+- `GetCellTypeSpecificNetwork()` - Get network for one cell type
+
+### Utilities
+- `IsReadyForInference()` - Check if object is ready
+- `GetRNA()`, `GetATAC()`, `GetCellMetadata()` - Access data slots
+
+## Output Format
+
+The results data frame contains:
+- **CellType**: Cell type for this connection
+- **Gene**: Target gene being regulated
+- **Peak1**: Promoter peak
+- **Peak2**: Enhancer peak  
+- **Pmean**: Posterior mean of regulatory coefficient
+- **Pvar**: Posterior variance (uncertainty)
+- **Importance**: Importance score
+
+Higher importance scores indicate stronger, more confident regulatory connections.
+
+
+## Requirements
+
+- R >= 4.0.0
+- Seurat >= 4.0.0
+- EnsDb.Hsapiens.v86 (for gene annotations)
+- See DESCRIPTION for full dependency list
 
 ## Citation
 
-If you use BayesCNet in your research, please cite:
-[Citation information to be added]
+If you use BayesCNet, please cite:
+
+ 
+
+## Issues and Support
+
+Please report issues on [GitHub](https://github.com/fzhaouf/BayesCNet/issues).
 
 ## License
 
-GPL-3
-
-## Contact
-
-[Your contact information]
+MIT

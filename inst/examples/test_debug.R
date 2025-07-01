@@ -9,14 +9,18 @@ options(BayesCNet.verbose = TRUE)
 ###### 1.5. Test Object Creation from seurat obj ######
 cat("\n=== Testing Object Creation ===\n")
 
-load("~/Library/CloudStorage/OneDrive-UniversityofFlorida/GraphModel/BayesCNet/inst/examples/pbmc_seurat.rda")
+load("/Users/fengdi/Library/CloudStorage/OneDrive-UniversityofFlorida/GraphModel/Rcode/DIRECT_NET/pbmc_seurat.rda")
 pbmc
 head(pbmc@meta.data)
 seurat_object = pbmc
 
-selected_cells = c("CD14 Mono", "CD4 Naive", "CD4 TEM", "CD8 Naive", "CD8 TEM_1", "Naive B")
+selected_cells = c("CD16 Mono", "CD4 TEM", "CD8 TEM_1", "Naive B")
 pbmc_subset <- subset(pbmc, subset = celltype %in% selected_cells)
 pbmc_subset$celltype <- droplevels(pbmc_subset$celltype)
+pbmc_subset@assays$SCT = NULL
+
+save(pbmc_subset, file = "pbmc_demo.r")
+
 
 bcnet_seurat <- CreateBayesCNet(pbmc_subset, cell_type_col = "celltype")
 
