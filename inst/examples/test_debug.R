@@ -19,8 +19,8 @@ pbmc_subset <- subset(pbmc, subset = celltype %in% selected_cells)
 pbmc_subset$celltype <- droplevels(pbmc_subset$celltype)
 pbmc_subset@assays$SCT = NULL
 
-save(pbmc_subset, file = "pbmc_demo.r")
-
+saveRDS(pbmc_subset, file="pbmc_demo.rds")
+pbmc_subset <- readRDS("pbmc_demo.rds")
 
 bcnet_seurat <- CreateBayesCNet(pbmc_subset, cell_type_col = "celltype")
 

@@ -200,7 +200,7 @@ Higher importance scores indicate stronger, more confident regulatory connection
 
 - R >= 4.0.0
 - Seurat >= 4.0.0
-- EnsDb.Hsapiens.v86 (for gene annotations)
+- Signac >= 1.13.0
 - See DESCRIPTION for full dependency list
 
 ## Citation
