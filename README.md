@@ -3,11 +3,11 @@
 **B**ayesian **C**ell-type-specific **Net**work Inference from Single-cell Multi-omics Data
 
 ## Overview
-<img src="inst/figures/fig2A.png" alt="BayesCNet Overview" width="60%" />
+<img src="inst/figures/fig2A.png" alt="BayesCNet Overview" width="80%" />
 
 BayesCNet infers cell-type-specific gene regulatory networks from paired single-cell RNA-seq and ATAC-seq data. It uses a hierarchical Bayesian framework that leverages cell type relationships to improve network inference accuracy.
 
-<img src="inst/figures/fig2B.png" alt="BayesCNet Downstream Analysis" width="60%" />
+<img src="inst/figures/fig2B.png" alt="BayesCNet Downstream Analysis" width="80%" />
 
 The inferred cell-type-specific cis-regulatory networks support downstream analyses, including: Heritability enrichment analysis using stratified linkage disequilibrium score regression (S-LDSC); TF–gene network construction, where transcription factors are connected to target genes through predicted enhancer elements, integrating motif binding predictions and TF expression.
 ## Installation
