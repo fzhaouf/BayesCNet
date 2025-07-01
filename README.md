@@ -3,11 +3,12 @@
 **B**ayesian **C**ell-type-specific **Net**work Inference from Single-cell Multi-omics Data
 
 ## Overview
-![BayesCNet Overview](inst/figures/fig2A.png)
+<img src="inst/figures/fig2A.png" alt="BayesCNet Overview" width="60%" />
 
 BayesCNet infers cell-type-specific gene regulatory networks from paired single-cell RNA-seq and ATAC-seq data. It uses a hierarchical Bayesian framework that leverages cell type relationships to improve network inference accuracy.
 
-![BayesCNet Downstream Analysis](inst/figures/fig2B.png)
+<img src="inst/figures/fig2B.png" alt="BayesCNet Downstream Analysis" width="60%" />
+
 The inferred cell-type-specific cis-regulatory networks support downstream analyses, including: Heritability enrichment analysis using stratified linkage disequilibrium score regression (S-LDSC); TF–gene network construction, where transcription factors are connected to target genes through predicted enhancer elements, integrating motif binding predictions and TF expression.
 ## Installation
 
@@ -187,14 +188,13 @@ bcnet <- RunBayesCNet(bcnet,
 The results data frame contains:
 - **CellType**: Cell type for this connection
 - **Gene**: Target gene being regulated
-- **Peak1**: Promoter peak
-- **Peak2**: Enhancer peak  
+- **Peak1**: Promoter region
+- **Peak2**: Enhancer region
 - **Pmean**: Posterior mean of regulatory coefficient
 - **Pvar**: Posterior variance (uncertainty)
 - **Importance**: Importance score
 
 Higher importance scores indicate stronger, more confident regulatory connections.
-
 
 ## Requirements
 
@@ -206,8 +206,6 @@ Higher importance scores indicate stronger, more confident regulatory connection
 ## Citation
 
 If you use BayesCNet, please cite:
-
- 
 
 ## Issues and Support
 
