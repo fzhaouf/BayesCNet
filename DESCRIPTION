@@ -6,7 +6,7 @@ Authors@R: c(
     person("Fengdi", "Zhao", email = "fengdizhao@ufl.edu", 
            role = c("aut", "cre"))
     )
-Maintainer: The package maintainer <yourself@somewhere.net>
+Maintainer: The package maintainer <fengdizhao@ufl.edu>
 Description: A hierarchical Bayesian framework for inferring cell type-specific 
     gene regulatory networks from single-cell multi-omics data. Leverages cell 
     type relationships to improve network accuracy, especially for rare cell 
